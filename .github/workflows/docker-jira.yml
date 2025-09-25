@@ -1,0 +1,45 @@
+name: Docker Build & Jira Integration
+ 
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+ 
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+ 
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+ 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+ 
+      - name: Build Docker image
+        id: docker_build
+        run: |
+          docker build -t websiteburger:v1 .
+ 
+      - name: Run Docker container
+        id: docker_run
+        run: |
+          docker run --rm -d -p 80:80 websiteburger:v1
+ 
+      - name: Create Jira Issue on Failure
+        if: failure()
+        uses: atlassian/gajira-create@v3
+        with:
+          project: "GC"                  # Replace with your Jira project key
+          issueType: "Bug"
+          summary: "Docker Build or Deployment Failed"
+          description: |
+            Build or deployment failed for branch ${{ github.ref }}.
+            Please check the workflow logs: ${{ github.workflow }} run #${{ github.run_id }}
+        env:
+          JIRA_BASE_URL: ${{ secrets.JIRA_URL }}
+          JIRA_USER_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_API_TOKEN: ${{ secrets.JIRA_TOKEN }}
