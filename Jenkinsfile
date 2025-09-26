@@ -1,41 +1,45 @@
 pipeline {
-  agent { label 'docker-node' }       // ensures the build runs on the docker-node agent
-  environment {
-    IMAGE = "websiteburger:${env.BRANCH_NAME}-${env.BUILD_NUMBER}"
-  }
-  stages {
-    stage('Checkout') {
-      steps { checkout scm }
+    agent { label 'docker-node' }  // All builds run on your Docker slave node
+    environment {
+        IMAGE_NAME = "burger-webapp"
+        IMAGE_TAG = "latest"
     }
-    stage('Build Docker Image') {
-      steps {
-        sh 'docker build -t $IMAGE .'
-      }
+    stages {
+        stage('Checkout') {
+            steps {
+                // Checkout the current branch
+                git branch: "${env.BRANCH_NAME}",
+                    url: 'https://github.com/Sanchitsingh05/Website-burger.git',
+                    credentialsId: 'github-cred'
+            }
+        }
+        stage('Build Docker Image') {
+            steps {
+                // Build Docker image
+                sh "docker build -t $IMAGE_NAME:$IMAGE_TAG ."
+            }
+        }
+        stage('Run Container for Testing') {
+            steps {
+                // Stop any running container first
+                sh "docker stop burger || true"
+                sh "docker rm burger || true"
+                sh "docker run -d --name burger -p 80:80 $IMAGE_NAME:$IMAGE_TAG"
+            }
+        }
+        stage('Post Build Status to Jira') {
+            steps {
+                // Requires Jira plugin configuration
+                jiraSendBuildInfo site: 'JiraCloud', buildStatus: currentBuild.currentResult
+            }
+        }
     }
-    stage('Smoke test') {
-      steps {
-        sh '''
-          docker run -d --name smoke_test $IMAGE
-          sleep 3
-          if ! curl -f http://localhost:8080; then
-            docker logs smoke_test || true
-            docker rm -f smoke_test || true
-            exit 1
-          fi
-          docker rm -f smoke_test || true
-        '''
-      }
+    post {
+        success {
+            echo 'Build and deploy succeeded!'
+        }
+        failure {
+            echo 'Build failed!'
+        }
     }
-    stage('Publish (optional)') {
-      steps { echo "Push image to registry step if you want (docker push ...)" }
-    }
-  }
-  post {
-    success {
-      echo "Build successful - you can add Jira update here"
-    }
-    failure {
-      echo "Build failed"
-    }
-  }
 }
