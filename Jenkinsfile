@@ -1,19 +1,19 @@
 pipeline {
-    agent { label 'docker-node' }  // Run builds only on docker-node
- 
+    agent { label 'docker-node' } // Run builds only on docker-node
+
     options {
         skipDefaultCheckout() // avoid duplicate git checkout
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
     }
- 
+
     stages {
         stage('Checkout') {
             steps {
-                checkout scm  // Jenkins automatically checks out the branch
+                checkout scm // Jenkins automatically checks out the branch
             }
         }
- 
+
         stage('Build Docker Image') {
             steps {
                 script {
@@ -22,7 +22,7 @@ pipeline {
                 }
             }
         }
- 
+
         stage('Run Tests') {
             steps {
                 script {
@@ -31,9 +31,11 @@ pipeline {
                 }
             }
         }
- 
+
         stage('Deploy (Optional)') {
-            when { branch 'main' }
+            when {
+                branch 'main'
+            }
             steps {
                 script {
                     echo "Deploying app (main branch only)..."
@@ -42,24 +44,25 @@ pipeline {
             }
         }
     }
- 
+
     post {
-    success {
-        jiraSendBuildInfo(
-            site: 'JiraCloud',   // must match the site name you configured in Jenkins
-            issueKey: 'JP-1',    // your Jira story/issue key
-            buildNumber: currentBuild.number.toString(),
-            buildDisplayName: currentBuild.displayName,
-            buildState: 'Successful'
-        )
-    }
-    failure {
-        jiraSendBuildInfo(
-            site: 'JiraCloud',
-            issueKey: 'JP-1',
-            buildNumber: currentBuild.number.toString(),
-            buildDisplayName: currentBuild.displayName,
-            buildState: 'Failed'
-        )
+        success {
+            jiraSendBuildInfo(
+                site: 'JiraCloud', // must match the site name you configured in Jenkins
+                issueKey: 'JP-1',  // your Jira story/issue key
+                buildNumber: currentBuild.number.toString(),
+                buildDisplayName: currentBuild.displayName,
+                buildState: 'Successful'
+            )
+        }
+        failure {
+            jiraSendBuildInfo(
+                site: 'JiraCloud',
+                issueKey: 'JP-1',
+                buildNumber: currentBuild.number.toString(),
+                buildDisplayName: currentBuild.displayName,
+                buildState: 'Failed'
+            )
+        }
     }
 }
