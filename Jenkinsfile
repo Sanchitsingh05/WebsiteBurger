@@ -25,6 +25,16 @@ pipeline {
         '''
       }
     }
+    stage ('Deploy'){
+steps {
+sh '''
+docker run --rm -d --name tmp_test -p 8081:80 ${IMAGE}
+sleep 2
+
+'''
+
+}
+}
   }
   post {
     always {
