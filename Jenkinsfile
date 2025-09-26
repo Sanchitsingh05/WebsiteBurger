@@ -44,13 +44,22 @@ pipeline {
     }
  
     post {
-        success {
-            echo "Build succeeded. Updating Jira..."
-            jiraSendBuildInfo site: 'JiraCloud', buildResult: 'SUCCESS'
-        }
-        failure {
-            echo "Build failed. Updating Jira..."
-            jiraSendBuildInfo site: 'JiraCloud', buildResult: 'FAILURE'
-        }
+    success {
+        jiraSendBuildInfo(
+            site: 'JiraCloud',   // must match the site name you configured in Jenkins
+            issueKey: 'JP-1',    // your Jira story/issue key
+            buildNumber: currentBuild.number.toString(),
+            buildDisplayName: currentBuild.displayName,
+            buildState: 'Successful'
+        )
+    }
+    failure {
+        jiraSendBuildInfo(
+            site: 'JiraCloud',
+            issueKey: 'JP-1',
+            buildNumber: currentBuild.number.toString(),
+            buildDisplayName: currentBuild.displayName,
+            buildState: 'Failed'
+        )
     }
 }
