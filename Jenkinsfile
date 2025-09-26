@@ -1,16 +1,23 @@
 pipeline {
-    agent { label 'docker-node' } // Run builds only on docker-node
+    agent { label 'docker-node' }
 
     options {
-        skipDefaultCheckout() // avoid duplicate git checkout
+        skipDefaultCheckout()
         buildDiscarder(logRotator(numToKeepStr: '10'))
         disableConcurrentBuilds()
+    }
+
+    environment {
+        JIRA_EMAIL = 'sanchit05march@gmail.com'         // Replace with your Jira email
+        JIRA_API_TOKEN = 'ATATT3xFfGF0xFADZsr3l8Cje9JgrkdkAY_36pOsu2MfC61L0FpUJBRPcPVwS-8-GE2ymiAL46-HNYUPQnle4JNAymHNbPEurkHnsi6eipVPmmU36UTEo_IoWQb8IDSmVQU5JCepR9QckC0cXDGNnSN86zMRQ1_TJIwalliFIm65hXmK__IPeNA=33CCE860'             // Replace with your Jira API token
+        JIRA_DOMAIN = 'https://sanchit05march.atlassian.net/'     // Replace with your Jira domain
+        JIRA_ISSUE = 'JP-1'                           // Replace with your Jira issue key
     }
 
     stages {
         stage('Checkout') {
             steps {
-                checkout scm // Jenkins automatically checks out the branch
+                checkout scm
             }
         }
 
@@ -26,8 +33,8 @@ pipeline {
         stage('Run Tests') {
             steps {
                 script {
-                    echo "Running tests (dummy for now)..."
-                    sh 'echo "Tests passed!"'
+                    echo "Running dummy tests..."
+                    sh 'echo "All tests passed!"'
                 }
             }
         }
@@ -38,8 +45,8 @@ pipeline {
             }
             steps {
                 script {
-                    echo "Deploying app (main branch only)..."
-                    // You could run docker run -d here or push to DockerHub
+                    echo "Deploying WebsiteBurger (main branch only)..."
+                    // Example: docker run -d -p 80:80 websiteburger:latest
                 }
             }
         }
@@ -47,22 +54,46 @@ pipeline {
 
     post {
         success {
-            jiraSendBuildInfo(
-                site: 'JiraCloud', // must match the site name you configured in Jenkins
-                issueKey: 'JP-1',  // your Jira story/issue key
-                buildNumber: currentBuild.number.toString(),
-                buildDisplayName: currentBuild.displayName,
-                buildState: 'Successful'
-            )
+            script {
+                sh """
+                curl -X POST \
+                  -u ${JIRA_EMAIL}:${JIRA_API_TOKEN} \
+                  -H "Content-Type: application/json" \
+                  --data '{
+                    "update": {
+                      "comment": [
+                        {
+                          "add": {
+                            "body": "✅ Jenkins build #${BUILD_NUMBER} succeeded for WebsiteBurger. View details in Jenkins."
+                          }
+                        }
+                      ]
+                    }
+                  }' \
+                  https://${JIRA_DOMAIN}/rest/api/3/issue/${JIRA_ISSUE}
+                """
+            }
         }
         failure {
-            jiraSendBuildInfo(
-                site: 'JiraCloud',
-                issueKey: 'JP-1',
-                buildNumber: currentBuild.number.toString(),
-                buildDisplayName: currentBuild.displayName,
-                buildState: 'Failed'
-            )
+            script {
+                sh """
+                curl -X POST \
+                  -u ${JIRA_EMAIL}:${JIRA_API_TOKEN} \
+                  -H "Content-Type: application/json" \
+                  --data '{
+                    "update": {
+                      "comment": [
+                        {
+                          "add": {
+                            "body": "❌ Jenkins build #${BUILD_NUMBER} failed for WebsiteBurger. Please investigate."
+                          }
+                        }
+                      ]
+                    }
+                  }' \
+                  https://${JIRA_DOMAIN}/rest/api/3/issue/${JIRA_ISSUE}
+                """
+            }
         }
     }
 }
