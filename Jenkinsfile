@@ -28,7 +28,7 @@ pipeline {
     stage ('Deploy'){
 steps {
 sh '''
-docker run --rm -d --name tmp_test -p 8081:80 ${IMAGE}
+docker run --rm -d --name tmp_test_1 -p 8081:80 ${IMAGE}
 sleep 2
 
 '''
