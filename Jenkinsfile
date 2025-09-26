@@ -46,11 +46,9 @@ pipeline {
     post {
         success {
             echo "Build succeeded. Updating Jira..."
-            jiraSendBuildInfo site: 'JiraCloud', buildResult: 'SUCCESS'
         }
         failure {
             echo "Build failed. Updating Jira..."
-            jiraSendBuildInfo site: 'JiraCloud', buildResult: 'FAILURE'
         }
     }
 }
