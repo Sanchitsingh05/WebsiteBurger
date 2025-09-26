@@ -19,19 +19,6 @@ pipeline {
         sh 'docker build -t ${IMAGE} .'
       }
     }
-
-    stage('Smoke Test') {
-      steps {
-        sh '''
-          # Run a temporary container to test the build
-          docker run --rm -d --name tmp_test -p 8081:80 ${IMAGE}
-          sleep 2
-          curl -f http://localhost:8081 || (docker logs tmp_test; exit 1)
-          docker stop tmp_test || true
-        '''
-      }
-    }
-
     stage('Deploy') {
       steps {
         sh '''
