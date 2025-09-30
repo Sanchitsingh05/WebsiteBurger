@@ -18,7 +18,7 @@ pipeline {
             steps {
                 script {
                     echo "Building Docker image..."
-                    sh 'docker build -t websiteburger:latest .'
+                    sh 'sudo docker build -t websiteburger:latest .'
                 }
             }
         }
