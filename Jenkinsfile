@@ -24,24 +24,24 @@ pipeline {
     }
 
     stage('SonarQube Analysis') {
-      steps {
-        withSonarQubeEnv('sonarqube-local') {
-          sh '''
-            if ! command -v sonar-scanner >/dev/null 2>&1; then
-              echo "Installing sonar-scanner for this run..."
-              curl -sSLo sonar.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
-              unzip -q sonar.zip
-              export PATH="$PWD/sonar-scanner-*/bin:$PATH"
-            fi
-            sonar-scanner \
-              -Dsonar.projectKey=burger-website \
-              -Dsonar.sources=. \
-              -Dsonar.host.url=$SONAR_HOST_URL \
-              -Dsonar.login=$SONAR_AUTH_TOKEN || true
-          '''
-        }
-      }
+  steps {
+    withSonarQubeEnv('sonarqube-local') {
+      sh '''
+        curl -sSLo sonar.tgz \
+          https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux-x64.tar.gz
+        tar -xzf sonar.tgz
+        SCANNER_HOME="$(ls -d sonar-scanner-*/ | head -n1)"
+        export PATH="$PWD/${SCANNER_HOME}bin:$PATH"
+
+        sonar-scanner \
+          -Dsonar.projectKey=burger-website \
+          -Dsonar.sources=. \
+          -Dsonar.host.url="$SONAR_HOST_URL" \
+          -Dsonar.login="$SONAR_AUTH_TOKEN" || true
+      '''
     }
+  }
+}
 
     stage('Build Docker image') {
       steps {
