@@ -2,9 +2,9 @@ pipeline {
   agent any
 
   environment {
-    REGISTRY_CREDENTIALS = 'dockerhub-creds' // Jenkins credential ID (username + password for Docker Hub)
-    DOCKER_IMAGE = "sanchit0305/burger-website"
-    SONARQUBE_SERVER = 'sonarqube-local'     // Name you will configure in Jenkins Global config
+    REGISTRY_CREDENTIALS = 'dockerhub-creds'               // Jenkins creds -> Docker Hub (username: sanchit0305, password: PAT)
+    DOCKER_IMAGE        = 'sanchit0305/burger-website'
+    // SONARQUBE_SERVER not needed; we use withSonarQubeEnv('sonarqube-local')
   }
 
   options {
@@ -22,22 +22,23 @@ pipeline {
         }
       }
     }
+
+    // --- Temporary probe to verify Jenkins can reach SonarQube on localhost:9000 ---
     stage('Ping Sonar from Jenkins') {
-  steps {
-    sh '''#!/usr/bin/env bash
+      steps {
+        sh '''#!/usr/bin/env bash
 set -e
 echo "[INFO] Probing SonarQube from Jenkins node…"
 curl -sf http://localhost:9000/api/system/status && echo
 '''
-  }
-}
-
+      }
+    }
 
     stage('SonarQube Analysis') {
-  steps {
-    withSonarQubeEnv('sonarqube-local') {
-      // Force bash (shebang MUST be the very first line)
-      sh '''#!/usr/bin/env bash
+      steps {
+        withSonarQubeEnv('sonarqube-local') {
+          // OPTION 1: Download CLI (robust tgz/zip fallback)
+          sh '''#!/usr/bin/env bash
 set -euo pipefail
 
 SCANNER_VERSION="5.0.1.3006"
@@ -74,9 +75,27 @@ sonar-scanner \
   -Dsonar.host.url="$SONAR_HOST_URL" \
   -Dsonar.login="$SONAR_AUTH_TOKEN" || true
 '''
+
+          // --- OPTION 2 (simpler): Dockerized scanner, no downloads ---
+          // sh '''#!/usr/bin/env bash
+          // docker run --rm --network=host \
+          //   -e SONAR_HOST_URL="$SONAR_HOST_URL" \
+          //   -e SONAR_TOKEN="$SONAR_AUTH_TOKEN" \
+          //   -v "$PWD:/usr/src" \
+          //   sonarsource/sonar-scanner-cli
+          // '''
+        }
+      }
     }
-  }
-}
+
+    // Optional: Fail fast if Quality Gate is red (needs Sonar webhook to Jenkins /sonarqube-webhook/)
+    // stage('Quality Gate') {
+    //   steps {
+    //     timeout(time: 5, unit: 'MINUTES') {
+    //       waitForQualityGate abortPipeline: true
+    //     }
+    //   }
+    // }
 
     stage('Build Docker image') {
       steps {
@@ -91,10 +110,10 @@ sonar-scanner \
       steps {
         script {
           docker.withRegistry('', REGISTRY_CREDENTIALS) {
-            sh """
+            sh '''
               docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
               docker push ${DOCKER_IMAGE}:latest
-            """
+            '''
           }
         }
       }
