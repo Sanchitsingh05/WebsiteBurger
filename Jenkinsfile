@@ -26,43 +26,44 @@ pipeline {
     stage('SonarQube Analysis') {
   steps {
     withSonarQubeEnv('sonarqube-local') {
-      sh '''
-        set -euo pipefail
+      // Force bash (shebang MUST be the very first line)
+      sh '''#!/usr/bin/env bash
+set -euo pipefail
 
-        SCANNER_VERSION="5.0.1.3006"
-        BASE="https://binaries.sonarsource.com/Distribution/sonar-scanner-cli"
-        TGZ_URL="${BASE}/sonar-scanner-cli-${SCANNER_VERSION}-linux-x64.tar.gz"
-        ZIP_URL="${BASE}/sonar-scanner-cli-${SCANNER_VERSION}-linux.zip"
+SCANNER_VERSION="5.0.1.3006"
+BASE="https://binaries.sonarsource.com/Distribution/sonar-scanner-cli"
+TGZ_URL="${BASE}/sonar-scanner-cli-${SCANNER_VERSION}-linux-x64.tar.gz"
+ZIP_URL="${BASE}/sonar-scanner-cli-${SCANNER_VERSION}-linux.zip"
 
-        rm -f sonar.tgz sonar.zip || true
+rm -f sonar.tgz sonar.zip || true
 
-        echo "[INFO] Trying tar.gz from SonarSource…"
-        if curl -fLsS -o sonar.tgz "$TGZ_URL"; then
-          if tar -tzf sonar.tgz >/dev/null 2>&1; then
-            tar -xzf sonar.tgz
-            SCANNER_HOME="$(tar -tzf sonar.tgz | head -1 | cut -d/ -f1)"
-          else
-            echo "[WARN] Downloaded tar is not a valid gzip, will try ZIP…"
-            rm -f sonar.tgz
-            curl -fLsS -o sonar.zip "$ZIP_URL"
-            unzip -oq sonar.zip
-            SCANNER_HOME="$(unzip -Z1 sonar.zip | head -1 | cut -d/ -f1)"
-          fi
-        else
-          echo "[INFO] tar.gz not available, falling back to ZIP…"
-          curl -fLsS -o sonar.zip "$ZIP_URL"
-          unzip -oq sonar.zip
-          SCANNER_HOME="$(unzip -Z1 sonar.zip | head -1 | cut -d/ -f1)"
-        fi
+echo "[INFO] Trying tar.gz from SonarSource…"
+if curl -fLsS -o sonar.tgz "$TGZ_URL"; then
+  if tar -tzf sonar.tgz >/dev/null 2>&1; then
+    tar -xzf sonar.tgz
+    SCANNER_HOME="$(tar -tzf sonar.tgz | head -1 | cut -d/ -f1)"
+  else
+    echo "[WARN] Downloaded tar is not a valid gzip, will try ZIP…"
+    rm -f sonar.tgz
+    curl -fLsS -o sonar.zip "$ZIP_URL"
+    unzip -oq sonar.zip
+    SCANNER_HOME="$(unzip -Z1 sonar.zip | head -1 | cut -d/ -f1)"
+  fi
+else
+  echo "[INFO] tar.gz not available, falling back to ZIP…"
+  curl -fLsS -o sonar.zip "$ZIP_URL"
+  unzip -oq sonar.zip
+  SCANNER_HOME="$(unzip -Z1 sonar.zip | head -1 | cut -d/ -f1)"
+fi
 
-        export PATH="$PWD/${SCANNER_HOME}/bin:$PATH"
+export PATH="$PWD/${SCANNER_HOME}/bin:$PATH"
 
-        sonar-scanner \
-          -Dsonar.projectKey=burger-website \
-          -Dsonar.sources=. \
-          -Dsonar.host.url="$SONAR_HOST_URL" \
-          -Dsonar.login="$SONAR_AUTH_TOKEN" || true
-      '''
+sonar-scanner \
+  -Dsonar.projectKey=burger-website \
+  -Dsonar.sources=. \
+  -Dsonar.host.url="$SONAR_HOST_URL" \
+  -Dsonar.login="$SONAR_AUTH_TOKEN" || true
+'''
     }
   }
 }
