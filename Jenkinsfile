@@ -22,6 +22,16 @@ pipeline {
         }
       }
     }
+    stage('Ping Sonar from Jenkins') {
+  steps {
+    sh '''#!/usr/bin/env bash
+set -e
+echo "[INFO] Probing SonarQube from Jenkins node…"
+curl -sf http://localhost:9000/api/system/status && echo
+'''
+  }
+}
+
 
     stage('SonarQube Analysis') {
   steps {
