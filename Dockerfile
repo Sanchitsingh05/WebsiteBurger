@@ -1,14 +1,5 @@
-# Use official Nginx image as base
+# Containerize a static HTML/CSS site with Nginx
 FROM nginx:alpine
- 
-# Remove default Nginx static files
-RUN rm -rf /usr/share/nginx/html/*
- 
-# Copy your website files into Nginx html folder
+# Copy all site files into the default Nginx web root
 COPY . /usr/share/nginx/html
- 
-# Expose port 80 to access website
-EXPOSE 80
- 
-# Start Nginx server
-CMD ["nginx", "-g", "daemon off;"]
+# Nginx listens on 80 by default

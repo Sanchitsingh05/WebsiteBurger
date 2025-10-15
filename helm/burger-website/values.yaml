@@ -1,0 +1,13 @@
+image:
+  repository: sanchit0305/burger-website
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+replicaCount: 1
+
+service:
+  type: NodePort
+  port: 80
+  nodePort: 30080  # open this port in the EC2 security group
+
+resources: {}

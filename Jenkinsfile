@@ -1,59 +1,92 @@
 pipeline {
-  agent { label 'docker-node' }
- 
+  agent any
+
   environment {
-    IMAGE = "websiteburger:${env.GIT_COMMIT?.substring(0,7)}"
+    REGISTRY_CREDENTIALS = 'dockerhub-creds' // Jenkins credential ID (username + password for Docker Hub)
+    DOCKER_IMAGE = "sanchit0305/burger-website"
+    SONARQUBE_SERVER = 'sonarqube-local'     // Name you will configure in Jenkins Global config
   }
- 
+
+  options {
+    skipDefaultCheckout(true)
+    timestamps()
+  }
+
   stages {
     stage('Checkout') {
       steps {
         checkout scm
-      }
-    }
- 
-    stage('Mark Pending in GitHub') {
-      steps {
         script {
-          // requires pipeline-githubnotify-step plugin
-          githubNotify context: 'ci/WebsiteBurger/build', status: 'PENDING', description: 'Build started on Jenkins'
+          def commit = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+          env.IMAGE_TAG = "${env.BRANCH_NAME}-${commit}"
         }
       }
     }
- 
-    stage('Build Docker image') {
+
+    stage('SonarQube Analysis') {
       steps {
-        sh 'docker build -t ${IMAGE} .'
-      }
-    }
- 
-    stage('Smoke test') {
-      steps {
-        script {
+        withSonarQubeEnv('sonarqube-local') {
           sh '''
-            docker run -d --name tmp_site -p 8082:80 ${IMAGE}
-            sleep 2
-            curl -fsS http://localhost:8082 || (docker logs tmp_site; exit 1)
-            docker rm -f tmp_site || true
+            if ! command -v sonar-scanner >/dev/null 2>&1; then
+              echo "Installing sonar-scanner for this run..."
+              curl -sSLo sonar.zip https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+              unzip -q sonar.zip
+              export PATH="$PWD/sonar-scanner-*/bin:$PATH"
+            fi
+            sonar-scanner \
+              -Dsonar.projectKey=burger-website \
+              -Dsonar.sources=. \
+              -Dsonar.host.url=$SONAR_HOST_URL \
+              -Dsonar.login=$SONAR_AUTH_TOKEN || true
           '''
         }
       }
     }
-  }
- 
-  post {
-    success {
-      script {
-        githubNotify context: 'ci/WebsiteBurger/build', status: 'SUCCESS', description: 'Build succeeded'
-        // send build info to Jira (Atlassian plugin)
-        jiraSendBuildInfo site: 'https://sanchit05march.atlassian.net/'
+
+    stage('Build Docker image') {
+      steps {
+        sh '''
+          docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} .
+          docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_IMAGE}:latest
+        '''
       }
     }
-    failure {
-      script {
-        githubNotify context: 'ci/WebsiteBurger/build', status: 'FAILURE', description: 'Build failed'
-        jiraSendBuildInfo site: 'https://sanchit05march.atlassian.net/'
+
+    stage('Push to Docker Hub') {
+      steps {
+        script {
+          docker.withRegistry('', REGISTRY_CREDENTIALS) {
+            sh """
+              docker push ${DOCKER_IMAGE}:${IMAGE_TAG}
+              docker push ${DOCKER_IMAGE}:latest
+            """
+          }
+        }
       }
+    }
+
+    stage('Deploy with Helm to Minikube') {
+      steps {
+        sh '''
+          kubectl config current-context
+          helm upgrade --install burger-website ./helm/burger-website \
+            --namespace burger --create-namespace \
+            --set image.repository=${DOCKER_IMAGE} \
+            --set image.tag=${IMAGE_TAG} \
+            --set service.nodePort=30080
+
+          kubectl -n burger rollout status deploy/burger-website --timeout=120s
+        '''
+      }
+    }
+  }
+
+  post {
+    success {
+      echo "Deployed => http://${env.EC2_PUBLIC_IP?:'EC2_PUBLIC_IP'}:30080/"
+    }
+    always {
+      cleanWs()
     }
   }
 }
